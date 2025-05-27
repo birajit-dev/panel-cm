@@ -20,9 +20,9 @@ interface PhotoEvent {
   title: string;
   eventType: string;
   date: string;
+  permalink?: string;
   images: ImageUpload[];
   qr_code?: string;
-  permalink?: string;
 }
 
 export default function EngagementPage() {
@@ -36,6 +36,7 @@ export default function EngagementPage() {
   const [uploadedImages, setUploadedImages] = useState<ImageUpload[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [successData, setSuccessData] = useState<{qr_code: string, photoLink: string} | null>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -83,44 +84,31 @@ export default function EngagementPage() {
     setUploadedImages(updatedImages);
   };
 
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setSuccessData(null);
 
     try {
-      const uploadPromises = uploadedImages.map(async (image) => {
-        if (!image.file) return null;
+      const formData = new FormData();
+      formData.append('title', photoEvent.title);
+      formData.append('eventType', photoEvent.eventType);
+      formData.append('date', photoEvent.date);
+      formData.append('permalink', photoEvent.title.toLowerCase().replace(/\s+/g, '-'));
 
-        const formData = new FormData();
-        formData.append('file', image.file);
-
-        const uploadResponse = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!uploadResponse.ok) throw new Error('Failed to upload image');
-        
-        const { url } = await uploadResponse.json();
-        return {
-          url,
-          caption: image.caption
-        };
+      // Add all files as 'images' array and captions array
+      uploadedImages.forEach((image, index) => {
+        if (image.file) {
+          formData.append('images', image.file);
+          formData.append('captions', image.caption);
+        }
       });
 
-      const uploadedImageUrls = await Promise.all(uploadPromises);
-
-      const response = await fetch('/api/photos/events', {
+      const response = await fetch(`${API_BASE_URL}/photos`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title: photoEvent.title,
-          eventType: photoEvent.eventType,
-          date: photoEvent.date,
-          images: uploadedImageUrls.filter(Boolean)
-        }),
+        body: formData,
       });
 
       if (!response.ok) {
@@ -129,6 +117,14 @@ export default function EngagementPage() {
 
       const data = await response.json();
       
+      // Set success data with QR code and photo link
+      if (data.photo.qr_code) {
+        setSuccessData({
+          qr_code: data.photo.qr_code,
+          photoLink: `https://domain.com/photoGallery/${data.photo.permalink}`
+        });
+      }
+
       toast({
         title: "Success!",
         description: "Photo event created successfully",

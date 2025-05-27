@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { FiEdit, FiTrash2, FiDownload, FiCalendar, FiUser, FiTag, FiSearch, FiPlus } from 'react-icons/fi';
+import { FiEdit, FiTrash2, FiDownload, FiCalendar, FiImage, FiTag, FiSearch, FiPlus } from 'react-icons/fi';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,12 +10,19 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 
 interface PhotoEvent {
-  id: string;
+  _id: string;
   title: string;
   date: string;
   qr_code: string;
   eventType: string;
-  photosCount?: number;
+  images: {
+    url: string;
+    caption: string;
+    _id: string;
+  }[];
+  permalink: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const getEventTypeColor = (eventType: string) => {
@@ -44,41 +51,39 @@ export default function EngagementListPage() {
   const { toast } = useToast();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
-  const [events, setEvents] = useState<PhotoEvent[]>([
-    {
-      id: '1',
-      title: 'John & Sarah Wedding',
-      date: '2024-04-15',
-      qr_code: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=event1',
-      eventType: 'Wedding',
-      photosCount: 247
-    },
-    {
-      id: '2', 
-      title: 'Company Annual Meeting',
-      date: '2024-04-20',
-      qr_code: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=event2',
-      eventType: 'Corporate',
-      photosCount: 132
-    },
-    {
-      id: '3',
-      title: 'Emma\'s Birthday Party',
-      date: '2024-04-25',
-      qr_code: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=event3', 
-      eventType: 'Birthday',
-      photosCount: 89
-    }
-  ]);
+  const [events, setEvents] = useState<PhotoEvent[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+        const response = await fetch(`${API_BASE_URL}/photos`);
+        if (!response.ok) throw new Error('Failed to fetch events');
+        const data = await response.json();
+        setEvents(data);
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to load events",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchEvents();
+  }, [toast]);
 
   const filteredEvents = events.filter(event =>
     event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     event.eventType.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleDownloadQR = async (qrUrl: string, title: string) => {
+  const handleDownloadQR = async (qrCode: string, title: string) => {
     try {
-      const response = await fetch(qrUrl);
+      const response = await fetch(qrCode);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -105,13 +110,28 @@ export default function EngagementListPage() {
     router.push(`/users/engagement/edit/${id}`);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this event?')) {
-      setEvents(events.filter(event => event.id !== id));
-      toast({
-        title: "Success",
-        description: "Event deleted successfully",
-      });
+      try {
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+        const response = await fetch(`${API_BASE_URL}/photos/${id}`, {
+          method: 'DELETE'
+        });
+        
+        if (!response.ok) throw new Error('Failed to delete event');
+        
+        setEvents(events.filter(event => event._id !== id));
+        toast({
+          title: "Success",
+          description: "Event deleted successfully",
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to delete event",
+          variant: "destructive"
+        });
+      }
     }
   };
 
@@ -148,7 +168,11 @@ export default function EngagementListPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          {filteredEvents.length === 0 ? (
+          {isLoading ? (
+            <div className="py-12 text-center">
+              <p>Loading events...</p>
+            </div>
+          ) : filteredEvents.length === 0 ? (
             <div className="py-12 text-center">
               <div className="mx-auto h-24 w-24 text-gray-400 mb-4">
                 <FiCalendar className="w-full h-full" />
@@ -168,7 +192,7 @@ export default function EngagementListPage() {
             <div className="divide-y">
               {filteredEvents.map((event) => (
                 <div 
-                  key={event.id}
+                  key={event._id}
                   className={`p-4 hover:bg-gradient-to-r ${getEventTypeGradient(event.eventType)} transition-all duration-200`}
                 >
                   <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
@@ -198,12 +222,10 @@ export default function EngagementListPage() {
                                 day: 'numeric'
                               })}
                             </span>
-                            {event.photosCount && (
-                              <span className="flex items-center gap-1 text-xs text-gray-600 bg-gray-50 px-2.5 py-0.5 rounded-full border border-gray-200">
-                                <FiUser className="h-3 w-3" />
-                                {event.photosCount} photos
-                              </span>
-                            )}
+                            <span className="flex items-center gap-1 text-xs text-gray-600 bg-gray-50 px-2.5 py-0.5 rounded-full border border-gray-200">
+                              <FiImage className="h-3 w-3" />
+                              {event.images.length} photos
+                            </span>
                           </div>
                         </div>
                         
@@ -220,7 +242,7 @@ export default function EngagementListPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleEdit(event.id)}
+                            onClick={() => handleEdit(event._id)}
                             className="hover:bg-white hover:shadow-sm transition-all"
                           >
                             <FiEdit className="h-4 w-4" />
@@ -228,7 +250,7 @@ export default function EngagementListPage() {
                           <Button
                             variant="destructive"
                             size="sm"
-                            onClick={() => handleDelete(event.id)}
+                            onClick={() => handleDelete(event._id)}
                             className="hover:shadow-sm transition-all"
                           >
                             <FiTrash2 className="h-4 w-4" />

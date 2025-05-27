@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { FiBarChart2, FiFolder, FiCalendar, FiMail, FiCheckCircle, FiSettings, FiLogOut, FiFeather, FiChevronLeft, FiChevronRight, FiImage, FiCpu, FiFile, FiUser, FiBell, FiUsers } from 'react-icons/fi';
+import { FiBarChart2, FiFolder, FiCalendar, FiMail, FiCheckCircle, FiSettings, FiLogOut, FiFeather, FiChevronLeft, FiChevronRight, FiImage, FiCpu, FiFile, FiUser, FiBell, FiUsers, FiSliders, FiList } from 'react-icons/fi';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -20,83 +20,68 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
   { 
     name: 'Dashboard', 
-    icon: <FiBarChart2 />, 
+    icon: <FiBarChart2 className="w-5 h-5" />, 
     href: '/users/dashboard',
     category: 'Overview'
   },
   { 
-    name: 'Add News', 
-    icon: <FiFeather />, 
-    href: '/users/news-ai/add-news',
+    name: 'Add Press Release', 
+    icon: <FiFeather className="w-5 h-5" />, 
+    href: '/users/press-release',
     category: 'Content'
   },
   { 
-    name: 'News AI', 
-    icon: <FiCpu />, 
-    href: '/users/news-ai',
+    name: 'Press Release', 
+    icon: <FiCpu className="w-5 h-5" />, 
+    href: '/users/press-release/list',
+    category: 'Content'
+  },
+  {
+    name: 'Sliders',
+    icon: <FiSliders className="w-5 h-5" />,
+    href: '/users/sliders',
     category: 'Content'
   },
   { 
-    name: 'Verify Content', 
-    icon: <FiCheckCircle />, 
-    href: '/users/verify-content',
-    category: 'Content'
+    name: 'Add Engagement', 
+    icon: <FiFeather className="w-5 h-5" />, 
+    href: '/users/engagement',
+    category: 'Media'
+  },
+  { 
+    name: 'Engagement', 
+    icon: <FiList className="w-5 h-5" />, 
+    href: '/users/engagement/list',
+    category: 'Media'
   },
   { 
     name: 'Photo Gallery', 
-    icon: <FiImage />, 
+    icon: <FiImage className="w-5 h-5" />, 
     href: '/users/photo-gallery',
     category: 'Media'
   },
   { 
     name: 'File Management', 
-    icon: <FiFile />, 
+    icon: <FiFile className="w-5 h-5" />, 
     href: '/users/file-management',
     category: 'Media'
   },
-  { 
-    name: 'Projects', 
-    icon: <FiFolder />, 
-    href: '/users/projects',
-    category: 'Management'
-  },
+  
   { 
     name: 'Calendar', 
-    icon: <FiCalendar />, 
+    icon: <FiCalendar className="w-5 h-5" />, 
     href: '/users/calendar',
     category: 'Management'
   },
-  { 
-    name: 'Messages', 
-    icon: <FiMail />, 
-    href: '/users/messages', 
-    badge: 3,
-    category: 'Communication'
-  },
-  {
-    name: 'Push Notifications',
-    icon: <FiBell />,
-    href: '/users/push-notifications',
-    category: 'Communication'
-  },
-  {
-    name: 'Subscribers',
-    icon: <FiUsers />,
-    href: '/users/subscriber',
-    category: 'Management'
-  },
+ 
+  
   { 
     name: 'Settings', 
-    icon: <FiSettings />, 
+    icon: <FiSettings className="w-5 h-5" />, 
     href: '/users/setting',
     category: 'System'
   },
-  { 
-    name: 'Author', 
-    icon: <FiUser />, 
-    href: '/users/author',
-    category: 'System'
-  },
+  
 ];
 
 interface SidebarItemProps {
@@ -166,7 +151,7 @@ export default function UsersLayout({ children }: UsersLayoutProps) {
               {sidebarOpen && (
                 <div className="flex items-center space-x-2">
                   <img src={`${process.env.NEXT_PUBLIC_API_URL}/uploads/images/1743926946350-kokthum.png`} alt="Company Logo" className="h-8 w-8 rounded-full shadow-lg" />
-                  <span className="text-lg font-semibold text-blue-600">Kokthum</span>
+                  <span className="text-lg font-semibold text-blue-600">ADMIN PANEL</span>
                 </div>
               )}
               <Button
@@ -178,14 +163,14 @@ export default function UsersLayout({ children }: UsersLayoutProps) {
                 {sidebarOpen ? <FiChevronLeft size={20} /> : <FiChevronRight size={20} />}
               </Button>
             </div>
-            <div className="px-3">
+            {/* <div className="px-3">
               {sidebarOpen && (
                 <div className="flex items-center space-x-2">
                   <FiUser className="text-xl text-blue-600" />
-                  <span className="text-sm font-medium text-blue-600">{username}</span>
+                  <span className="text-sm font-medium text-blue-600"></span>
                 </div>
               )}
-            </div>
+            </div> */}
             <nav className="space-y-1 px-2">
               {Object.entries(groupedMenuItems).map(([category, items]) => (
                 <div key={category} className="mb-4">
@@ -214,7 +199,7 @@ export default function UsersLayout({ children }: UsersLayoutProps) {
                   variant="ghost"
                   className={`w-full justify-start ${!sidebarOpen && 'justify-center'} hover:bg-red-100 hover:text-red-600 transition-colors`}
                 >
-                  <FiLogOut className="text-xl mr-2" />
+                  <FiLogOut className="w-5 h-5 mr-2" />
                   {sidebarOpen && (
                     <span className="text-sm font-medium">Logout</span>
                   )}

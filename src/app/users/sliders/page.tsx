@@ -26,12 +26,13 @@ import {
 } from "@/components/ui/table";
 
 interface SliderItem {
-  id: string;
+  _id: string;
   title: string;
   subtitle: string;
   order: number;
   isActive: boolean;
   imageUrl: string;
+  link?: string;
 }
 
 export default function SliderManagementPage() {
@@ -41,44 +42,21 @@ export default function SliderManagementPage() {
   const [currentSlider, setCurrentSlider] = useState<SliderItem | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [sliderToDelete, setSliderToDelete] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
   // Fetch sliders from API
   useEffect(() => {
     const fetchSliders = async () => {
       setIsLoading(true);
       try {
-        // Replace with actual API call
-        // const response = await fetch('/api/sliders');
-        // const data = await response.json();
-        const mockData: SliderItem[] = [
-          {
-            id: '1',
-            title: 'Summer Collection',
-            subtitle: 'Discover our new arrivals',
-            order: 1,
-            isActive: true,
-            imageUrl: 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=800&auto=format&fit=crop'
-          },
-          {
-            id: '2',
-            title: 'Winter Special',
-            subtitle: 'Up to 50% off',
-            order: 2,
-            isActive: true,
-            imageUrl: 'https://images.unsplash.com/photo-1483729558449-99ef09a8c325?w=800&auto=format&fit=crop'
-          },
-          {
-            id: '3',
-            title: 'Limited Edition',
-            subtitle: 'Exclusive items',
-            order: 3,
-            isActive: false,
-            imageUrl: 'https://images.unsplash.com/photo-1551232864-3f0890e580d9?w=800&auto=format&fit=crop'
-          }
-        ];
-        setSliders(mockData);
+        const response = await fetch(`${API_BASE_URL}/sliders`);
+        if (!response.ok) throw new Error('Failed to fetch sliders');
+        const data = await response.json();
+        setSliders(data);
       } catch (error) {
         toast({
           title: "Error",
@@ -95,6 +73,7 @@ export default function SliderManagementPage() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      setSelectedFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
@@ -105,13 +84,15 @@ export default function SliderManagementPage() {
 
   const openAddDialog = () => {
     setCurrentSlider({
-      id: '',
+      _id: '',
       title: '',
       subtitle: '',
       order: sliders.length > 0 ? Math.max(...sliders.map(s => s.order)) + 1 : 1,
       isActive: true,
-      imageUrl: ''
+      imageUrl: '',
+      link: ''
     });
+    setSelectedFile(null);
     setImagePreview(null);
     setIsDialogOpen(true);
   };
@@ -119,6 +100,7 @@ export default function SliderManagementPage() {
   const openEditDialog = (slider: SliderItem) => {
     setCurrentSlider(slider);
     setImagePreview(slider.imageUrl);
+    setSelectedFile(null);
     setIsDialogOpen(true);
   };
 
@@ -128,27 +110,35 @@ export default function SliderManagementPage() {
 
     setIsLoading(true);
     try {
-      // Here you would typically upload the image first if it's a new one
-      // Then send the slider data to your API
+      const formData = new FormData();
+      formData.append('title', currentSlider.title);
+      formData.append('subtitle', currentSlider.subtitle);
+      formData.append('order', currentSlider.order.toString());
+      formData.append('isActive', currentSlider.isActive.toString());
+      if (currentSlider.link) formData.append('link', currentSlider.link);
+      if (selectedFile) formData.append('image', selectedFile);
+
+      const url = currentSlider._id ? 
+        `${API_BASE_URL}/sliders/${currentSlider._id}` :
+        `${API_BASE_URL}/sliders`;
+
+      const response = await fetch(url, {
+        method: currentSlider._id ? 'PUT' : 'POST',
+        body: formData
+      });
+
+      if (!response.ok) throw new Error('Failed to save slider');
+
+      const data = await response.json();
       
-      // Mock API response
-      if (currentSlider.id) {
-        // Update existing slider
-        setSliders(sliders.map(s => 
-          s.id === currentSlider.id ? currentSlider : s
-        ));
+      if (currentSlider._id) {
+        setSliders(sliders.map(s => s._id === data.slider._id ? data.slider : s));
         toast({
           title: "Success",
           description: "Slider updated successfully",
         });
       } else {
-        // Add new slider
-        const newSlider = {
-          ...currentSlider,
-          id: Math.random().toString(36).substring(2, 9),
-          imageUrl: imagePreview || 'https://via.placeholder.com/800x400'
-        };
-        setSliders([...sliders, newSlider]);
+        setSliders([...sliders, data.slider]);
         toast({
           title: "Success",
           description: "Slider added successfully",
@@ -171,9 +161,13 @@ export default function SliderManagementPage() {
 
     setIsLoading(true);
     try {
-      // Replace with actual API call
-      // await fetch(`/api/sliders/${sliderToDelete}`, { method: 'DELETE' });
-      setSliders(sliders.filter(s => s.id !== sliderToDelete));
+      const response = await fetch(`${API_BASE_URL}/sliders/${sliderToDelete}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) throw new Error('Failed to delete slider');
+
+      setSliders(sliders.filter(s => s._id !== sliderToDelete));
       toast({
         title: "Success",
         description: "Slider deleted successfully",
@@ -191,23 +185,42 @@ export default function SliderManagementPage() {
     }
   };
 
-  const moveSlider = (id: string, direction: 'up' | 'down') => {
-    const index = sliders.findIndex(s => s.id === id);
+  const moveSlider = async (id: string, direction: 'up' | 'down') => {
+    const index = sliders.findIndex(s => s._id === id);
     if (index === -1) return;
 
     const newSliders = [...sliders];
     const newOrder = direction === 'up' ? index - 1 : index + 1;
 
     if (newOrder >= 0 && newOrder < newSliders.length) {
-      // Swap orders
-      [newSliders[index].order, newSliders[newOrder].order] = 
-        [newSliders[newOrder].order, newSliders[index].order];
+      const slider1 = newSliders[index];
+      const slider2 = newSliders[newOrder];
       
-      // Sort by order
-      newSliders.sort((a, b) => a.order - b.order);
-      setSliders(newSliders);
+      try {
+        const response = await fetch(`${API_BASE_URL}/sliders/${slider1._id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ order: slider2.order })
+        });
 
-      // Here you would typically call API to update orders
+        if (!response.ok) throw new Error('Failed to update order');
+
+        // Swap orders
+        [newSliders[index].order, newSliders[newOrder].order] = 
+          [newSliders[newOrder].order, newSliders[index].order];
+        
+        // Sort by order
+        newSliders.sort((a, b) => a.order - b.order);
+        setSliders(newSliders);
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to update slider order",
+          variant: "destructive"
+        });
+      }
     }
   };
 
@@ -259,11 +272,11 @@ export default function SliderManagementPage() {
               </TableHeader>
               <TableBody>
                 {sliders.sort((a, b) => a.order - b.order).map((slider) => (
-                  <TableRow key={slider.id}>
+                  <TableRow key={slider._id}>
                     <TableCell>
                       <div className="relative h-16 w-24 rounded-md overflow-hidden">
                         <Image
-                          src={slider.imageUrl}
+                          src={`http://localhost:3002${slider.imageUrl}`}
                           alt={slider.title}
                           fill
                           className="object-cover"
@@ -277,7 +290,7 @@ export default function SliderManagementPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => moveSlider(slider.id, 'up')}
+                          onClick={() => moveSlider(slider._id, 'up')}
                           disabled={slider.order === 1}
                           className="h-6 w-6"
                         >
@@ -287,7 +300,7 @@ export default function SliderManagementPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => moveSlider(slider.id, 'down')}
+                          onClick={() => moveSlider(slider._id, 'down')}
                           disabled={slider.order === sliders.length}
                           className="h-6 w-6"
                         >
@@ -304,11 +317,28 @@ export default function SliderManagementPage() {
                         )}
                         <Switch
                           checked={slider.isActive}
-                          onCheckedChange={(checked) => {
-                            setSliders(sliders.map(s => 
-                              s.id === slider.id ? {...s, isActive: checked} : s
-                            ));
-                            // Here you would typically call API to update status
+                          onCheckedChange={async (checked) => {
+                            try {
+                              const response = await fetch(`${API_BASE_URL}/sliders/${slider._id}`, {
+                                method: 'PUT',
+                                headers: {
+                                  'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({ isActive: checked })
+                              });
+
+                              if (!response.ok) throw new Error('Failed to update status');
+
+                              setSliders(sliders.map(s => 
+                                s._id === slider._id ? {...s, isActive: checked} : s
+                              ));
+                            } catch (error) {
+                              toast({
+                                title: "Error",
+                                description: "Failed to update slider status",
+                                variant: "destructive"
+                              });
+                            }
                           }}
                         />
                       </div>
@@ -326,7 +356,7 @@ export default function SliderManagementPage() {
                           variant="destructive"
                           size="sm"
                           onClick={() => {
-                            setSliderToDelete(slider.id);
+                            setSliderToDelete(slider._id);
                             setIsDeleteDialogOpen(true);
                           }}
                         >
@@ -347,7 +377,7 @@ export default function SliderManagementPage() {
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>
-              {currentSlider?.id ? 'Edit Slider' : 'Add New Slider'}
+              {currentSlider?._id ? 'Edit Slider' : 'Add New Slider'}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
@@ -379,6 +409,21 @@ export default function SliderManagementPage() {
                       {...currentSlider, subtitle: e.target.value} : null)
                   }
                   className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="link" className="text-right">
+                  Link
+                </Label>
+                <Input
+                  id="link"
+                  value={currentSlider?.link || ''}
+                  onChange={(e) => 
+                    setCurrentSlider(currentSlider ? 
+                      {...currentSlider, link: e.target.value} : null)
+                  }
+                  className="col-span-3"
+                  placeholder="Optional: Add a link for this slider"
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
@@ -423,6 +468,7 @@ export default function SliderManagementPage() {
                     accept="image/*"
                     onChange={handleImageChange}
                     className="cursor-pointer"
+                    required={!currentSlider?._id}
                   />
                   {imagePreview && (
                     <div className="mt-4 relative h-40 w-full rounded-md overflow-hidden border">
